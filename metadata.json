@@ -1,0 +1,5 @@
+{
+  "name": "PDF Question Extractor",
+  "description": "Extract specific question types from multiple PDF files using AI and export as editable HTML.",
+  "requestFramePermissions": []
+}

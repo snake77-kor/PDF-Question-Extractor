@@ -103,94 +103,61 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDownload = () => {
+  const handleDownloadWord = () => {
     if (!editorRef.current) return;
-    
+
     const content = editorRef.current.innerHTML;
-    const fullHtml = `
-      <!DOCTYPE html>
-      <html>
+    const preHtml = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
       <head>
-        <meta charset="UTF-8">
+        <meta charset="utf-8">
         <title>추출된 문제</title>
         <style>
-          body { 
-            font-family: 'Malgun Gothic', 'Noto Sans KR', sans-serif; 
-            line-height: 1.6; 
-            max-width: 800px; 
-            margin: 2rem auto; 
-            padding: 0 1rem; 
-            color: #333;
-            word-break: keep-all;
-          }
-          h2 {
-            font-size: 1.5rem;
-            color: #1e40af; /* Indigo-800 */
-            border-bottom: 2px solid #e2e8f0;
-            padding-bottom: 0.5rem;
-            margin-top: 3rem;
-            margin-bottom: 1.5rem;
-          }
-          .question-item { 
-            margin-bottom: 3rem; 
-            padding-bottom: 2rem; 
-            page-break-inside: avoid;
-          }
-          .source {
-            font-size: 0.9rem;
-            color: #666;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-          }
-          .question-title {
-            font-weight: bold;
-            font-size: 1.1em;
-            margin-bottom: 1rem;
-          }
-          .passage {
-            background-color: #f9f9f9;
-            padding: 1.5rem;
-            margin: 1rem 0;
-            border-radius: 4px;
-            border-left: 4px solid #e5e7eb;
-            line-height: 1.8;
-            font-size: 0.95em;
-            text-align: justify;
-          }
-          .box {
-            border: 1px solid #000;
-            padding: 1rem;
-            margin: 1rem 0;
-            position: relative;
-            background: #fff;
-          }
-          .choices {
-            list-style-type: none;
-            padding-left: 0;
-            margin-top: 1rem;
-          }
-          .choices li {
-            margin-bottom: 0.5rem;
-            padding-left: 1.8rem;
-            text-indent: -1.8rem; /* Hanging indent for circle numbers */
-          }
-          img { max-width: 100%; height: auto; display: block; margin: 1rem auto; }
-          hr { border: 0; border-top: 1px dashed #ccc; margin: 2rem 0; }
+          body { font-family: 'Malgun Gothic', 'Noto Sans KR', sans-serif; line-height: 1.6; }
+          .box { border: 1px solid #000; padding: 10px; margin: 10px 0; }
+          .passage { background-color: #f9f9f9; padding: 15px; border-left: 4px solid #ccc; margin: 10px 0; }
+          .source { color: #888; font-size: 0.9em; margin-bottom: 5px; }
+          .question-title { font-weight: bold; font-size: 1.1em; margin-bottom: 10px; }
+          .choices { list-style: none; padding-left: 0; }
+          .choices li { margin-bottom: 5px; text-indent: -1.5em; padding-left: 1.5em; }
+          .answer-box { margin-top: 15px; padding: 10px; background-color: #f0fdf4; border: 1px solid #86efac; color: #166534; }
         </style>
       </head>
-      <body contenteditable="true">
+      <body>
         ${content}
       </body>
       </html>
     `;
 
-    const blob = new Blob([fullHtml], { type: 'text/html' });
+    const blob = new Blob(['\ufeff', preHtml], { type: 'application/msword' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'extracted_questions.html';
+    a.download = 'extracted_questions.doc';
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleCopyForGoogleDocs = async () => {
+    if (!editorRef.current) return;
+
+    try {
+      const content = editorRef.current.innerHTML;
+      // Google Docs에 붙여넣기 좋게 스타일을 포함한 blob 생성
+      const blob = new Blob([content], { type: 'text/html' });
+      const textBlob = new Blob([editorRef.current.innerText], { type: 'text/plain' });
+
+      const data = [new ClipboardItem({
+        ['text/html']: blob,
+        ['text/plain']: textBlob
+      })];
+
+      await navigator.clipboard.write(data);
+      alert("✅ 복사되었습니다!\n\n이제 Google Docs(docs.new)를 열고 붙여넣기(Cmd+V) 하세요.");
+    } catch (err) {
+      console.error('Failed to copy: ', err);
+      alert("복사에 실패했습니다. 브라우저 권한을 확인해주세요.");
+    }
   };
 
   const handleReset = () => {
@@ -228,19 +195,19 @@ const App: React.FC = () => {
       {/* Main Content */}
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
-          
+
           {/* Left Column: Inputs */}
           <div className="space-y-6">
-            
+
             {/* Step 1: Upload */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
               <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
                 <span className="bg-indigo-100 text-indigo-700 w-6 h-6 rounded-full inline-flex items-center justify-center text-sm mr-2">1</span>
                 PDF 파일 업로드
               </h2>
-              <FileUploader 
-                files={files} 
-                onFilesSelected={handleFilesSelected} 
+              <FileUploader
+                files={files}
+                onFilesSelected={handleFilesSelected}
                 onRemoveFile={handleRemoveFile}
                 disabled={status === ProcessingStatus.PROCESSING}
               />
@@ -253,7 +220,7 @@ const App: React.FC = () => {
                   <span className="bg-indigo-100 text-indigo-700 w-6 h-6 rounded-full inline-flex items-center justify-center text-sm mr-2">2</span>
                   추출할 문제 유형 선택
                 </h2>
-                <button 
+                <button
                   onClick={toggleAll}
                   className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
                   disabled={status === ProcessingStatus.PROCESSING}
@@ -261,17 +228,17 @@ const App: React.FC = () => {
                   {selectedTypeIds.size === QUESTION_TYPES.length ? '전체 해제' : '전체 선택'}
                 </button>
               </div>
-              
+
               {/* Note about excluded listening questions is hidden as requested */}
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                 {QUESTION_TYPES.map((type) => (
-                  <label 
-                    key={type.id} 
+                  <label
+                    key={type.id}
                     className={`
                       relative flex items-center p-3 rounded-lg border cursor-pointer transition-all
-                      ${selectedTypeIds.has(type.id) 
-                        ? 'bg-indigo-50 border-indigo-300 ring-1 ring-indigo-300' 
+                      ${selectedTypeIds.has(type.id)
+                        ? 'bg-indigo-50 border-indigo-300 ring-1 ring-indigo-300'
                         : 'bg-white border-slate-200 hover:bg-slate-50'
                       }
                       ${status === ProcessingStatus.PROCESSING ? 'opacity-60 cursor-not-allowed' : ''}
@@ -306,7 +273,7 @@ const App: React.FC = () => {
                 <svg className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
-                {errorMessage}
+                <span dangerouslySetInnerHTML={{ __html: errorMessage }}></span>
               </div>
             )}
 
@@ -316,7 +283,7 @@ const App: React.FC = () => {
               disabled={status === ProcessingStatus.PROCESSING || files.length === 0 || selectedTypeIds.size === 0}
               className={`w-full py-4 rounded-lg font-bold text-lg shadow-lg transition-all transform hover:-translate-y-0.5
                 ${status === ProcessingStatus.PROCESSING || files.length === 0 || selectedTypeIds.size === 0
-                  ? 'bg-indigo-400 cursor-not-allowed' 
+                  ? 'bg-indigo-400 cursor-not-allowed'
                   : 'bg-indigo-600 hover:bg-indigo-700 text-white active:bg-indigo-800'
                 } flex items-center justify-center`}
             >
@@ -343,28 +310,39 @@ const App: React.FC = () => {
                   미리보기 및 편집
                 </h2>
                 {status === ProcessingStatus.COMPLETE && (
-                  <button
-                    onClick={handleDownload}
-                    className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-                  >
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                    </svg>
-                    HTML 다운로드
-                  </button>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={handleDownloadWord}
+                      className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                      </svg>
+                      Word 저장
+                    </button>
+                    <button
+                      onClick={handleCopyForGoogleDocs}
+                      className="flex items-center px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m2 4h2a2 2 0 012 2v10a2 2 0 01-2 2h-2a2 2 0 01-2-2v-10a2 2 0 012-2z"></path>
+                      </svg>
+                      Google Docs용 복사
+                    </button>
+                  </div>
                 )}
               </div>
-              
+
               <div className="relative flex-grow bg-white overflow-hidden">
                 {status === ProcessingStatus.IDLE && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 p-8 text-center">
                     <svg className="w-16 h-16 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                     </svg>
-                    <p className="text-lg">파일을 업로드하고 유형을 선택하면<br/>결과가 여기에 표시됩니다.</p>
+                    <p className="text-lg">파일을 업로드하고 유형을 선택하면<br />결과가 여기에 표시됩니다.</p>
                   </div>
                 )}
-                
+
                 {status === ProcessingStatus.PROCESSING && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-white bg-opacity-90 z-10">
                     <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
@@ -374,14 +352,14 @@ const App: React.FC = () => {
                 )}
 
                 <div className="h-full overflow-auto p-8 bg-white">
-                   <div 
+                  <div
                     ref={editorRef}
                     className="prose prose-indigo max-w-none outline-none min-h-full"
                     contentEditable={status === ProcessingStatus.COMPLETE}
                     suppressContentEditableWarning={true}
                     dangerouslySetInnerHTML={{ __html: resultHtml }}
                     style={{ whiteSpace: 'pre-wrap' }}
-                   />
+                  />
                 </div>
               </div>
             </div>

@@ -8,13 +8,13 @@ import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
-// Initialize lazily to prevent crash on load if key is missing
-const getAiClient = () => {
-  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY; // Support both env var names
-  if (!apiKey) {
-    throw new Error("API Key is missing. Please check your .env file.");
+// Initialize Google Generative AI
+const getAiClient = (apiKey?: string) => {
+  const key = apiKey || process.env.API_KEY || process.env.GEMINI_API_KEY;
+  if (!key) {
+    throw new Error("API Key가 없습니다. 화면 우측 상단의 'API Key 설정' 버튼을 눌러 키를 입력해주세요.");
   }
-  return new GoogleGenerativeAI(apiKey);
+  return new GoogleGenerativeAI(key);
 };
 
 const extractTextFromPdf = async (file: File): Promise<string> => {
@@ -38,9 +38,16 @@ const extractTextFromPdf = async (file: File): Promise<string> => {
   return fullText;
 };
 
+interface QuestionType {
+  id: string;
+  label: string;
+  description: string;
+}
+
 export const extractQuestionsFromPdfs = async (
   files: File[],
-  userInstruction: string
+  userInstruction: string,
+  apiKey?: string // API Key 인자 추가
 ): Promise<string> => {
   try {
     // Extract text from all PDFs
@@ -104,11 +111,13 @@ export const extractQuestionsFromPdfs = async (
     `;
 
     // Use the latest available Gemini model
-    const genAI = getAiClient();
-    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || "";
-    const maskedKey = apiKey.length > 10 ? `${apiKey.substring(0, 10)}...` : "키 없음";
+    const genAI = getAiClient(apiKey);
 
-    // 가장 안정적이고 표준적인 모델만 사용합니다. 
+    // 키 마스킹 처리 (로그용)
+    const effectiveKey = apiKey || process.env.API_KEY || process.env.GEMINI_API_KEY || "";
+    const maskedKey = effectiveKey.length > 10 ? `${effectiveKey.substring(0, 10)}...` : "키 없음";
+
+    // API 조회 결과 확인된 '실제 존재하는 모델' 목록으로 시도합니다. 
     // 여러 모델을 시도하면 Quota(사용량)를 더 빨리 소진할 수 있으므로 확실한 모델에 집중합니다.
     const modelsToTry = [
       "gemini-1.5-flash",

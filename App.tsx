@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { extractQuestionsFromPdfs } from './services/geminiService';
 import { UploadedFile, ProcessingStatus } from './types';
 import { FileUploader } from './components/FileUploader';
@@ -32,12 +32,36 @@ const App: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
 
+  // API Key State
+  const [apiKey, setApiKey] = useState<string>('');
+  const [showApiKeyInput, setShowApiKeyInput] = useState<boolean>(false);
+
+  // Load API Key from local storage on mount
+  useEffect(() => {
+    const savedKey = localStorage.getItem('GEMINI_API_KEY');
+    if (savedKey) {
+      setApiKey(savedKey);
+    }
+  }, []);
+
+  const handleSaveApiKey = (key: string) => {
+    setApiKey(key);
+    localStorage.setItem('GEMINI_API_KEY', key);
+    if (key) setShowApiKeyInput(false);
+  };
+
+  const handleClearApiKey = () => {
+    setApiKey('');
+    localStorage.removeItem('GEMINI_API_KEY');
+  };
+
   const handleFilesSelected = (newFiles: File[]) => {
     const newUploadedFiles: UploadedFile[] = newFiles.map((file) => ({
       id: Math.random().toString(36).substring(7),
       file,
     }));
     setFiles((prev) => [...prev, ...newUploadedFiles]);
+    setErrorMessage(null);
   };
 
   const handleRemoveFile = (id: string) => {
@@ -71,9 +95,15 @@ const App: React.FC = () => {
       setErrorMessage("최소한 하나의 문제 유형을 선택해주세요.");
       return;
     }
+    if (!apiKey) {
+      setErrorMessage("Gemini API Key를 설정해주세요.");
+      setShowApiKeyInput(true); // Open the API key input panel
+      return;
+    }
 
     setStatus(ProcessingStatus.PROCESSING);
     setErrorMessage(null);
+    setResultHtml('');
 
     try {
       // Construct instruction based on selection
@@ -94,7 +124,7 @@ const App: React.FC = () => {
       `;
 
       const rawFiles = files.map((f) => f.file);
-      const html = await extractQuestionsFromPdfs(rawFiles, instruction);
+      const html = await extractQuestionsFromPdfs(rawFiles, instruction, apiKey);
       setResultHtml(html);
       setStatus(ProcessingStatus.COMPLETE);
     } catch (error) {
@@ -181,15 +211,62 @@ const App: React.FC = () => {
             </div>
             <h1 className="text-xl font-bold text-slate-800">PDF 문제 추출기 (AI)</h1>
           </div>
-          {status === ProcessingStatus.COMPLETE && (
+
+          <div className="flex items-center space-x-4">
             <button
-              onClick={handleReset}
-              className="text-sm text-slate-500 hover:text-indigo-600 font-medium"
+              onClick={() => setShowApiKeyInput(!showApiKeyInput)}
+              className={`text-sm font-medium px-3 py-1.5 rounded-md transition-colors flex items-center
+                 ${apiKey ? 'text-green-600 bg-green-50 hover:bg-green-100' : 'text-slate-500 hover:text-indigo-600 bg-slate-100'}`}
             >
-              처음으로 돌아가기
+              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+              </svg>
+              {apiKey ? 'API Key 설정됨' : 'API Key 설정'}
             </button>
-          )}
+
+            {status === ProcessingStatus.COMPLETE && (
+              <button
+                onClick={handleReset}
+                className="text-sm text-slate-500 hover:text-indigo-600 font-medium"
+              >
+                처음으로 돌아가기
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* API Key Input Panel */}
+        {showApiKeyInput && (
+          <div className="bg-slate-50 border-b border-slate-200 p-4 animate-fade-in">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center space-x-3">
+              <span className="text-sm font-medium text-slate-700">Gemini API Key:</span>
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="AIza..."
+                className="flex-grow max-w-md px-3 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <button
+                onClick={() => handleSaveApiKey(apiKey)}
+                className="px-3 py-1.5 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700"
+              >
+                저장
+              </button>
+              {apiKey && (
+                <button
+                  onClick={handleClearApiKey}
+                  className="px-3 py-1.5 bg-white border border-slate-300 text-slate-600 text-sm font-medium rounded-md hover:bg-slate-50"
+                >
+                  삭제
+                </button>
+              )}
+              <span className="text-xs text-slate-500 ml-2">
+                * 키는 브라우저에만 저장되며 서버로 전송되지 않습니다.
+              </span>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Main Content */}
